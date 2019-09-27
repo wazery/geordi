@@ -18,7 +18,7 @@ module Geordi
     def select_server
       selected_server = choose do |menu|
         @config.servers.each do |server|
-          menu.choice(server) { server }
+          menu.choice(server[:type] + ": " + server[:ip]) { server[:ip] }
         end
 
         # Default to the first listed server (by convention, the first server

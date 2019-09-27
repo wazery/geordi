@@ -1,6 +1,8 @@
+require 'aws-sdk-ec2'
+require 'aws-sdk-autoscaling'
+
 module Geordi
   class CapistranoConfig
-
     attr_accessor :root
 
     def initialize(stage)
@@ -10,12 +12,28 @@ module Geordi
     end
 
     def user(server)
-      cap2user = deploy_info[ /^\s*set\s*:user,\s*['"](.*?)['"]/, 1 ]
-      cap2user || deploy_info[ /^\s*server\s*['"]#{ server }['"],.*user.{1,4}['"](.*?)['"]/m, 1 ]
+      @cap2user ||= deploy_info[ /^\s*set\s*:aws_deploy_user,\s*['"](.*?)['"]/, 1 ]
+      @cap2user || deploy_info[ /^\s*server\s*['"]#{ server }['"],.*user.{1,4}['"](.*?)['"]/m, 1 ]
+    end
+    
+    def asg_group_name
+      @asg_group_name ||= deploy_info[ /^\s*set\s*:aws_autoscaling_group_name,\s*['"](.*?)['"]/, 1 ]
     end
 
     def servers
-      deploy_info.scan(/^\s*server\s*['"](.*?)['"]/).flatten
+      autoscaling_client   = ::Aws::AutoScaling::Client.new(region: region, credentials: credentials)
+      autoscaling_resource = ::Aws::AutoScaling::Resource.new(client: autoscaling_client)
+      ec2_client           = ::Aws::EC2::Client.new(region: region, credentials: credentials)
+      ec2_resource         = ::Aws::EC2::Resource.new(client: ec2_client)
+      autoscaling_group    = autoscaling_resource.group(asg_group_name)
+      asg_instances        = autoscaling_group.instances
+
+      asg_instances.map do |asg_instance|
+        next if asg_instance.health_status != 'Healthy'
+
+        ec2_instance = ec2_resource.instance(asg_instance.id)
+        { ip: ec2_instance.public_ip_address, type: "AutoScaling" }
+      end + deploy_info.scan(/(\d+\.\d+\.\d+\.\d+).*sidekiq/).flatten.map { |ip| { ip: ip, type: "Sidekiq"} }
     end
 
     def primary_server
@@ -66,6 +84,24 @@ Maybe Capistrano is not installed in this project.
         current = Dir.pwd
       end
       current
+    end
+
+    def credentials
+      @credentials ||= begin
+        region                = ENV['AWS_REGION']
+        aws_access_key_id     = ENV['AWS_ACCESS_KEY_ID']
+        aws_secret_access_key = ENV['AWS_SECRET_ACCESS_KEY']
+        raise <<-ERROR if region.nil? || aws_access_key_id.nil? || aws_secret_access_key.nil?
+Please export AWS security credentials into your current shell session!
+AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+        ERROR
+
+        Aws::Credentials.new(aws_access_key_id, aws_secret_access_key)
+      end
+    end
+
+    def region
+      @region ||= ENV['AWS_REGION']
     end
 
   end
