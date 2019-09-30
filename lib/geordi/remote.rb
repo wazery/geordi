@@ -57,7 +57,7 @@ module Geordi
     end
 
     def shell(options = {})
-      server = options[:select_server] ? select_server : @config.primary_server
+      server = options[:select_server] ? select_server : @config.primary_server[:ip]
 
       remote_command = "cd #{@config.remote_root} && #{@config.shell}"
       remote_command << " -c '#{options[:remote_command]}'" if options[:remote_command]
