@@ -7,7 +7,8 @@ PATH
 GEM
   remote: http://rubygems.org/
   specs:
-    addressable (2.3.8)
+    addressable (2.8.0)
+      public_suffix (>= 2.0.2, < 5.0)
     aruba (0.6.2)
       childprocess (>= 0.3.6)
       cucumber (>= 1.1.1)
@@ -48,6 +49,7 @@ GEM
     parallel (0.5.16)
     parallel_tests (0.6.18)
       parallel
+    public_suffix (4.0.6)
     rake (10.5.0)
     rspec-expectations (3.4.0)
       diff-lcs (>= 1.2.0, < 2.0)
